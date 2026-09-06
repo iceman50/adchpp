@@ -1,2 +1,3 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Copyright (C) 2026 iceman50
+# Auto-detect text files and keep both repository and working-tree endings as LF.
+* text=auto eol=lf

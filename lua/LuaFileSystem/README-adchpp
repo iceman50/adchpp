@@ -1,0 +1,3 @@
+This directory contains Lua FileSystem <https://keplerproject.github.io/luafilesystem>.
+
+The F_SPEC def has been added in lfs.h.

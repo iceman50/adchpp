@@ -1,0 +1,187 @@
+-- 3.1.0 2025-05-11 --
+* [L#2110291] Improve Bloom filter update requests (emtee)
+* [L#2081649] Fix crash on invalid IP in INF (emtee)
+* Remove IA-64 and 32-bit x86 build support, making amd64/x86-64 default (cologic)
+* Align socket buffer size defaults to better fit modern systems
+* Fix compilation with up to date build tools (cologic, emtee)
+* 64-bit only Windows binary distributions that require SSE4.2 CPU instruction set to run
+  (reach support in case you still need a build for a 32-bit / old CPU) 
+* Windows release compiled with OpenSSL 3.2.4  
+
+-- 3.0.2 2023-06-15 --
+* Upgrade license to GPLv3
+* Add bind address setting (emtee)
+* Windows release compiled with OpenSSL 3.1.1
+
+-- 3.0.1 2022-05-18 --
+* [L#1956253] Improve certificate generation on Windows
+* Windows release compiled with OpenSSL 1.1.1n
+
+-- 3.0.0 2021-10-08 --
+* Make some TLS connection parameters configurable (cologic, emtee)
+* Require TLS 1.2 or newer (currently only TLS 1.3)-based ADCS connections by default (cologic)
+* [L#1088638] Add parameter to control the size of usercount allowed to have overflowing buffers (emtee)
+* Fix certificate generation on Windows (emtee)
+* Increase the default DH key value to 2048 in response to https://weakdh.org (thanks kcchouette)
+* Update Boost to version 1.68
+* Update OpenSSL to version 1.1.1, with TLS 1.3 support
+* [L#880488] Remove an obsolete pinger workaround
+* Add +cfg minmainchatlevel so restricted users can still send PMs
+* Add +setting as an alias to +cfg
+
+-- 2.12.1 2016-03-08 --
+* Move the MOTD example Lua script to a more general script that supports
+  multiple texts
+
+-- 2.12.0 2015-04-06 --
+* [L#907372] Fix wrong log file placement
+* [L#1440795] Show hub address in the user registration confirmation message (if available) (emtee)
+* Apply hub address format for pingers changes mandated by ADC-EXT 1.0.9. (emtee)
+* Improve UTF-8 RFC-3629 compliance (cologic) 
+* [L#1317710] Support TLS versions 1.1, 1.2, and newer (cologic)
+
+-- 2.11.2 2014-04-14 --
+* [L#1206293] Fix crashes after calling +reload
+* [L#1206293] Fix commands that output entity info
+
+-- 2.11.1 2014-04-10 --
+* Improve Lua scripts
+
+-- 2.11.0 2013-07-19 --
+* Reinstate the DisconnectTimeout setting, increase its default from 5 to 10 ms
+
+-- 2.10.1 2013-07-17 --
+* Improve nick validation (speak up if you think it's not optimal)
+
+-- 2.10.0 2013-07-13 --
+* Make -Wl,--no-undefined conditional as required by the Bloom plugin API
+* Add an API to the bloom manager for notifying when the filters get updated
+* Add an API to the bloom manager allowing to make requests to the user's filter
+* Add an API to the bloom manager allowing to export the filter stats
+* Allow usage of the system's Boost Libraries
+* Allow usage of the system's Lua Libraries
+* Allow specifying the path to the system lua binary
+* Improve Lua scripts
+* [L#1118699] Normalize per-entity data storage from Lua
+* Update Boost to version 1.53
+* Stricter nick validation
+
+-- 2.9.0 2012-10-23 --
+* Add Lua FileSystem
+* Add Lua Socket
+* Separate user level detection for limit and flood protection
+* Add NI, DE, CID and user command validation to comply with the protocol
+* [L#920788] Fix signalSend in lua (thanks Andy Chmilenko)
+* [L#920791] Expose a few different functions to scripts (thanks Andy Chmilenko)
+* Restrict +listreg and +regnick to operators
+* Update Boost to version 1.51
+* Stabilize the shutdown process
+
+-- 2.8.1 2012-05-30 --
+* [L#830841] Python plugin api signal fix (thanks Andy Chmilenko)
+* [L#881790] Make python callback callable (thanks Andy Chmilenko)
+* [L#940745] Improve build option granularity (thanks klondike)
+* [L#940756] Improve Ruby detection (thanks klondike)
+* Update Boost to version 1.49
+* [L#880488] Update the temporary workaround for the dchublist pinger
+
+-- 2.8.0 2011-12-11 --
+* Send a QUI with TL-1 during fatal STA disconnects
+* Process most settings again
+* [L#717858] Fix disconnection of users taking too long to log in
+* [L#717858] Consider users as connected before they start the TLS handshake
+* Add access.guard.lua a floodprotection and removing duplicated functions
+* Extend basic rules and added spamming protection to it
+* Add entity logging functions with history on changes
+* Add FO extension to hub INF
+* Add hasParam to lua API
+* [L#873985] Fix duplicated entries in regtables
+* [L#831522] Add partial matching for params of the +help command
+* [L#813760] Extended bansre with search and action selection
+* [L#864642] Delayed sending hub's INF to end of the VERIFY or IDENTIFY state
+* Remove the license page from the installer
+* Fix mixup between the access.bot & the actual bot
+* Add to ClientManager signalReady Entity is ready for read / write
+* [L#804024] Separate application and version in INF
+* [L#888280] Fixed guide regarding reg exp in bans lua
+* Added aio.lua load/save settings and users.txt with backup
+* Listen on all available sockets
+* Improve Lua scripts, extra info in regged users table, history since last logon, etc
+* Update user guide
+* Update Boost to 1.48
+* Add a sendRaw method for scripts
+* [L#309402] Rudimentary IPv6 support
+* [L#829179] Expose SimpleXML::getChildName to scripts
+
+-- 2.7.0 2011-02-23 --
+* Export PluginManager::attention to scripts
+* Update Boost to version 1.45
+* [L#537905] Add redhat init scripts (thanks E_zombie)
+* [L#609436] Fix SCons warnings
+* Save some memory by not pre-allocating read buffer
+* [L#650587] Add NAT & RNT to the known commands
+* [L#654218] Fix timer issues
+* Propagate error codes
+* Count write timeouts
+* Start PHP and Ruby bindings
+* [L#610321] Fix some warnings
+* Fix an uninitialized member issue resulting in random behaviour
+* [L#508641] Make bot disconnect asynchronous
+* Re-add missing bloom stats
+* [L#609435] Fix bloom race condition
+* Add basic rules (sharesize, slots, etc...)
+* Update user guide
+* [L#521681] Pass reason in disconnect signal
+* [L#491951] Fix messages not being sent
+
+-- 2.5.2 2010-07-23 --
+* Compiled with C++0x support
+* Update Boost to version 1.43
+* Improve Lua scripts
+* More performant and less crash-prone timers
+
+-- 2.5.1 2010-06-20 --
+* [L#591701] Fix compiling out of the bzr repo
+* Fix the "unloading" event which was never being called
+* Unload scripts in the reverse order of addition
+* Improve Lua scripts
+* [L#596669] Disconnect ghosts
+
+-- 2.5.0 2010-05-03 --
+* Improve Lua scripts: various bug fixes, support PING
+* Clients are disconnected with the DI flag of QUI
+* Update to Lua 5.1.4
+* Update to boost 1.42
+* Better support of Python extensions
+* Add an icon and version info to the Windows daemon
+* Allow local IPs
+* Bloom plugin: filter more TTH searches
+* [L#427706] Fix some crashes
+* Hub will automatically reject new users if its having bandwidth problems
+* [L#502280] Fix Windows service
+* Accept relative paths in config files
+* [L#518972] Fix python memory leak
+ 
+* Plugins can use timers (see SocketManager::addJob)
+* [L#491951] Give unsent messages 10 seconds before disconnecting
+* Send IPs of passive users
+
+-- 2.4 2008-10-02 --
+* Improve Lua scripts
+
+-- 2.3 2008-09-29 --
+* Fix service install on Windows
+* Fix plugins not being unloaded correctly
+* Use boost asio for sockets instead of home brew
+* TLS support
+* Fix a few crashes here and there
+* Improve Lua scripts
+
+-- 2.2 2008-02-12 --
+* access.lua: fixed message type for MSG
+* Some minor socket fixes
+* Initial Bloom filter implementation
+* Fixed 100% cpu / infinite resend bug
+
+-- 2.1 2008-01-06 --
+* Initial ADC 1.0 release

@@ -1,0 +1,79 @@
+# vim: set filetype=py
+
+
+def getRevision(env):
+    """Attempt to get information about the repository, via the "hg log"
+    command. Its output is formatted via the "-T" parameter (see "hg templates"
+    for details).
+
+    :return: Version information string, or "[unknown]" on failure.
+    :rtype: str.
+    """
+
+    try:
+        import subprocess
+
+        ret = subprocess.check_output(
+            'hg log -r tip -T "{node | short} - {date | isodate}"',
+            shell=True,
+            text=True,
+        )
+        if ret:
+            return ret
+    except:
+        pass
+    return "[unknown]"
+
+
+Import("dev source_path")
+
+env, target, sources = dev.prepare_build(
+    source_path, "adchpp", shared_precompiled_header="adchpp"
+)
+
+env.Append(CPPPATH=["."])
+
+env.Append(CPPDEFINES=["BUILDING_ADCHPP=1"])
+
+if env["CC"] == "cl":  # MSVC
+    env.Append(LIBS=["advapi32", "user32"])
+
+if "HAVE_DL" in env["CPPDEFINES"]:
+    env.Append(LIBS=["dl"])
+
+if "HAVE_PTHREAD" in env["CPPDEFINES"]:
+    env.Append(LIBS=["pthread"])
+
+if "HAVE_OPENSSL" in env["CPPDEFINES"]:
+    if dev.is_win32():
+        if env["CC"] == "cl":  # MSVC
+            if env["mode"] == "debug":
+                env.Prepend(LIBS=["ssleay32d", "libeay32d"])
+            else:
+                env.Prepend(LIBS=["ssleay32", "libeay32"])
+        else:
+            env.Prepend(LIBS=["ssl", "crypto"])
+        env.Append(LIBS=["gdi32"])  # something in OpenSSL uses CreateDC etc...
+        env.Append(CPPPATH=["#/openssl/include"])
+        openssl_lib = "#/openssl/lib/"
+        if env["arch"] != "x86":
+            openssl_lib += env["arch"] + "/"
+        env.Append(LIBPATH=[openssl_lib])
+    else:
+        env.Prepend(LIBS=["ssl", "crypto"])
+
+for i, source in enumerate(sources):
+    if source.find("version.cpp") != -1:
+        rev = ["ADCHPP_REVISION=" + getRevision(env)]
+        # Prior to SCons 4.5, env["CPPDEFINES"] is a list, while
+        # https://github.com/SCons/scons/commit/b28e86d47635d1ae4ae63eac603f166ec7c95221
+        # changes it to a deque. Retain compatibility with both.
+        # https://scons.org/scons-450-is-available.html documents this as well.
+        cppdefines = env["CPPDEFINES"]
+        sources[i] = env.SharedObject(source, CPPDEFINES=cppdefines + type(cppdefines)(rev))
+
+headers = dev.get_sources(source_path, "*.h")
+
+ret = env.SharedLibrary(target, sources)
+
+Return("ret")

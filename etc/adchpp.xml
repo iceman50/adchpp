@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<!-- RTF0 integration changes Copyright (C) 2026 iceman50 -->
+<!-- RTF0/BBS0 integration changes Copyright (C) 2026 iceman50 -->
 <ADCHubPlusPlus>
 
 <!-- IMPORTANT: under Linux, you should use absolute paths in the various path settings 
@@ -126,5 +126,7 @@
 		<Plugin>Bloom</Plugin>
 		<!-- Rich-text chat negotiation and relay policy (RTF0) -->
 		<Plugin>RTF0</Plugin>
+		<!-- Persistent bulletin-board index service (BBS0) -->
+		<Plugin>BBS0</Plugin>
 	</Plugins>
 </ADCHubPlusPlus>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Copyright (C) 2026 iceman50. Licensed under GPL-3.0-or-later. -->
+<!-- Hub-side support for BBS0 version 0.1 (2026-08-11). -->
+<BBS0>
+	<Settings Enabled="1"
+		IndexFile="BBS0.index"
+		MaxPostsPerBoard="5000"
+		PostInterval="60"
+		MaxSubscriptions="8"
+		CompactEvery="256"/>
+
+	<Boards>
+		<!-- Permission values: guest, registered, operator, superuser, owner, none. -->
+		<Board Name="general"
+			Title="General discussion"
+			Description="Anything about this hub"
+			MaxSize="262144"
+			ReplayDays="90"
+			Subscribe="guest"
+			Post="registered"
+			Reply="registered"
+			WithdrawOwn="registered"
+			WithdrawAny="operator"/>
+	</Boards>
+</BBS0>

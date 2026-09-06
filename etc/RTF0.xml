@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Copyright (C) 2026 iceman50. Licensed under GPL-3.0-or-later. -->
+<!-- Hub-side support for RTF0 version 0.2 (2026-08-03). -->
+<RTF0>
+	<!-- When disabled, ADRTF0 is not advertised and incoming RT1 flags are removed. -->
+	<Enabled>1</Enabled>
+</RTF0>

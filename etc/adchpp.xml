@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- RTF0 integration changes Copyright (C) 2026 iceman50 -->
 <ADCHubPlusPlus>
 
 <!-- IMPORTANT: under Linux, you should use absolute paths in the various path settings 
@@ -123,5 +124,7 @@
 		<Plugin>Script</Plugin>
 		<!-- Bloom filter plugin, helps save upload bandwidth at a slight expense of memory and download bandwidth -->
 		<Plugin>Bloom</Plugin>
+		<!-- Rich-text chat negotiation and relay policy (RTF0) -->
+		<Plugin>RTF0</Plugin>
 	</Plugins>
 </ADCHubPlusPlus>

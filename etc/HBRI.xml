@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Copyright (C) 2026 iceman50. Licensed under GPL-3.0-or-later. -->
+<HBRI>
+	<!--
+	HBRI is disabled until both public validation addresses and the shared ADC
+	listener port are configured. Address4/Address6 may be literals or DNS names.
+	Example:
+	<Settings Enabled="1" Address4="hub-v4.example.org"
+		Address6="hub-v6.example.org" Port="2780"/>
+	-->
+	<Settings Enabled="0" Address4="" Address6="" Port=""/>
+</HBRI>

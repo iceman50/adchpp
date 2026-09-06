@@ -1,3 +1,4 @@
+# Copyright (C) 2026 iceman50
 # vim: set filetype: py
 
 EnsureSConsVersion(4, 0, 0)
@@ -23,7 +24,8 @@ gcc_flags = {
     "release": ["-O3", "-fno-ipa-cp-clone"],
 }
 
-gcc_xxflags = {"common": ["-std=gnu++0x"], "debug": [], "release": []}
+# Use the strict ISO mode so GNU extensions cannot hide C++11 portability issues.
+gcc_xxflags = {"common": ["-std=c++11"], "debug": [], "release": []}
 
 msvc_flags = {
     # 4100: unreferenced formal parameter
@@ -66,6 +68,9 @@ msvc_flags = {
 # we set /LD(d) by default for all sub-projects, since most of them are DLLs. don't forget to
 # remove it when building executables!
 
+# MSVC has no C++11-specific /std switch; supported MSVC releases expose
+# their C++11 language support in the default mode. compiler.h enforces the
+# minimum compiler version for that path.
 msvc_xxflags = {"common": [], "debug": [], "release": []}
 
 gcc_link_flags = {"common": ["-g", "$UNDEF", "-time"], "debug": [], "release": ["-O3"]}
@@ -123,6 +128,11 @@ opts.AddVariables(
     ListVariable("plugins", "The plugins to compile", "all", plugins),
     ListVariable("langs", "The language bindings to compile", "all", langs),
     BoolVariable("secure", "Add support for secure TLS connections via OpenSSL", "yes"),
+    (
+        "openssl",
+        "OpenSSL root containing include/ and lib/ (Windows)",
+        "openssl",
+    ),
     BoolVariable(
         "gch",
         "Use GCH when compiling GUI (disable if you have linking problems with mingw)",
@@ -163,6 +173,10 @@ env = Environment(
     TARGET_ARCH=TARGET_ARCH,
     MSVS_ARCH=TARGET_ARCH,
 )
+
+# Keep the OpenSSL location configurable so a trusted local static build can
+# be consumed without copying or modifying third-party sources in this tree.
+env["OPENSSL_ROOT"] = Dir(env["openssl"]).abspath
 
 
 # filter out boost from dependencies to get a speedier rebuild scan
@@ -302,13 +316,41 @@ if not env.GetOption("clean") and not env.GetOption("help"):
             conf.env.Append(CPPDEFINES=["HAVE_SYS_EPOLL_H"])
         if conf.CheckLib("pthread", "pthread_create"):
             conf.env.Append(CPPDEFINES=["HAVE_PTHREAD"])
-        if env["secure"] and conf.CheckLib("ssl", "SSL_connect"):
+        if env["secure"]:
+            if not conf.CheckLib("ssl", "SSL_connect"):
+                raise Exception(
+                    "secure=yes was requested, but OpenSSL could not be linked"
+                )
             conf.env.Append(CPPDEFINES=["HAVE_OPENSSL"])
         if conf.CheckLib("dl", "dlopen"):
             conf.env.Append(CPPDEFINES=["HAVE_DL"])
     else:
-        if env["secure"] and os.path.exists(Dir("#/openssl/include").abspath):
+        if env["secure"]:
+            openssl_header = os.path.join(
+                env["OPENSSL_ROOT"], "include", "openssl", "ssl.h"
+            )
+            if not os.path.isfile(openssl_header):
+                raise Exception(
+                    "secure=yes was requested, but OpenSSL headers were not found at "
+                    + env["OPENSSL_ROOT"]
+                )
             conf.env.Append(CPPDEFINES=["HAVE_OPENSSL"])
+
+        # LuaSocket 2.0 supplies ip_mreq itself on newer MinGW-w64 releases,
+        # while current winsock.h supplies the same type. Keep the vendored
+        # source untouched and suppress the system typedef only for C sources
+        # when the compatibility header demonstrates that it is necessary.
+        lua_socket_header = env.File(
+            "#/lua/LuaSocket/socket/wsocket.h"
+        ).abspath.replace("\\", "/")
+        if (
+            "gcc" in env["TOOLS"]
+            and ("Script" in env["plugins"] or "lua" in env["langs"])
+            and not conf.CheckCHeader(lua_socket_header)
+        ):
+            conf.env.Append(CFLAGS=["-D_MINGW_IP_MREQ1_H"])
+            if not conf.CheckCHeader(lua_socket_header):
+                raise Exception("Cannot compile the bundled LuaSocket headers")
 
     env = conf.Finish()
 

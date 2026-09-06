@@ -1,3 +1,4 @@
+// Copyright (C) 2026 iceman50
 = ADCH++ Basic User Guide
 Created by the DC++ team
 Document Version 0.3.16
@@ -185,11 +186,15 @@ To make the secure encrypted TLS connectivity possible to your hub you must gene
 | Linux 			| Install the openssl package (e.g apt-get install openssl)
 |==============================================
 
-To automatically generate files and place them to the deafult path you can use the certificate files generator script (generate_certs.cmd or .sh depending on your OS) provided in the ADCH\++ release package. Alternatively you can download the script for your operating system (https://sourceforge.net/p/adchpp/code/ci/tip/tree/windows/Generate_certs.cmd[Windows] or https://sourceforge.net/p/adchpp/code/ci/tip/tree/linux/generate_certs.sh[Linux]) from the ADCH++ code repository as well.
+To automatically generate and validate these files in the default path on Windows, run `Generate_certs.ps1` from the ADCH\++ program folder. Supply the public DNS name clients use to connect to the hub:
+
+ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Generate_certs.ps1 -CommonName hub.example.org
+
+The script finds `openssl.exe` on `PATH` or in common OpenSSL installation folders. Use `-OpenSslPath 'C:\path\to\openssl.exe'` when it is installed elsewhere, and use `-Force` only when you intend to replace existing certificate files. The older `Generate_certs.cmd` script remains available for compatibility. Linux users can run `generate_certs.sh` from the release package.
 
 The script will create and automatically place the generated certificate files to a folder named 'certs' under the ADCH++ program folder.
 
-IMPORTANT: If you run the certificate files generator script under Windows it is recommended to install OpenSSL to its default folder. You may need to run the script in elevated mode (as Administrator).
+IMPORTANT: The generated private key is intentionally unencrypted so ADCH\++ can start unattended. Restrict access to `certs\privkey.pem` to the ADCH\++ service account and administrators. Administrator privileges are only needed when the ADCH\++ folder itself is not writable by your account.
 
 Alternatively you can generate the .pem files manually using the following commands:
 

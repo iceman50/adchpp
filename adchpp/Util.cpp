@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,7 +19,14 @@
 
 #include "adchpp.h"
 
+#include <climits>
 #include <random>
+
+#ifdef HAVE_OPENSSL
+#include <openssl/rand.h>
+#elif defined(_WIN32)
+#include <bcrypt.h>
+#endif
 
 #include "Util.h"
 #include "FastAlloc.h"
@@ -337,6 +345,51 @@ uint32_t Util::rand() {
 	return dre();
 }
 #endif
+
+bool Util::secureRandom(uint8_t* data, size_t size) throw() {
+	if(!data || size == 0) {
+		return false;
+	}
+
+#ifdef HAVE_OPENSSL
+	// RAND_bytes uses OpenSSL's operating-system-seeded CSPRNG. Chunking keeps
+	// the size conversion defined even when size_t is wider than int.
+	while(size > 0) {
+		const int bytes = static_cast<int>(std::min(size, static_cast<size_t>(INT_MAX)));
+		if(RAND_bytes(data, bytes) != 1) {
+			return false;
+		}
+		data += bytes;
+		size -= static_cast<size_t>(bytes);
+	}
+	return true;
+#elif defined(_WIN32)
+	while(size > 0) {
+		const ULONG bytes = static_cast<ULONG>(std::min(size,
+			static_cast<size_t>(ULONG_MAX)));
+		if(BCryptGenRandom(0, data, bytes, BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
+			return false;
+		}
+		data += bytes;
+		size -= static_cast<size_t>(bytes);
+	}
+	return true;
+#else
+	try {
+		std::random_device random;
+		while(size > 0) {
+			const unsigned int value = random();
+			const size_t bytes = std::min(size, sizeof(value));
+			memcpy(data, &value, bytes);
+			data += bytes;
+			size -= bytes;
+		}
+		return true;
+	} catch(...) {
+		return false;
+	}
+#endif
+}
 
 bool Util::isPrivateIp(std::string const& ip) {
 	struct in_addr addr;

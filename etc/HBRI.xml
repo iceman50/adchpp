@@ -2,8 +2,10 @@
 <!-- Copyright (C) 2026 iceman50. Licensed under GPL-3.0-or-later. -->
 <HBRI>
 	<!--
-	HBRI is disabled until both public validation addresses and the shared ADC
-	listener port are configured. Address4/Address6 may be literals or DNS names.
+	HBRI is disabled until IPv4 and IPv6 listeners are active on the shared ADC
+	port and both public validation addresses resolve. Address4/Address6 may be
+	literals or family-specific DNS names. They may be left empty when matching
+	HubAddress4/HubAddress6 values are set on the Server entry in adchpp.xml.
 	Example:
 	<Settings Enabled="1" Address4="hub-v4.example.org"
 		Address6="hub-v6.example.org" Port="2780"/>

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -73,6 +74,7 @@ private:
 	friend class SocketFactory;
 
 	void completeAccept(const boost::system::error_code&) throw();
+	void completeInit(const boost::system::error_code&) throw();
 	void ready() throw();
 	void prepareWrite() throw();
 	void completeWrite(const boost::system::error_code& ec, size_t bytes) throw();

@@ -82,6 +82,12 @@
 		if you omit BindAddress. An example simple server setting:
 		<Server Port="2780" BindAddress="192.168.0.250"/>
 
+		For independent IPv4 and IPv6 sockets, use BindAddress4 and BindAddress6.
+		IPV6_V6ONLY is enabled so both families can safely use the same port. HBRI
+		can obtain its numeric callback endpoints from HubAddress4 and HubAddress6:
+		<Server Port="2780" BindAddress4="0.0.0.0" BindAddress6="::"
+			HubAddress4="192.0.2.10" HubAddress6="2001:db8::10"/>
+
 		To create secure connections, set TLS="1" and define the following (preferably absolute)
 		paths: Certificate, PrivateKey, TrustedPath, DHParams. An example secure server setting:
 		<Server Port="2780" TLS="1" Certificate="certs/cacert.pem" PrivateKey="certs/privkey.pem" TrustedPath="certs/trusted/" DHParams="certs/dhparam.pem"/>
@@ -93,7 +99,8 @@
 
 		This will generate certs valid for 3 years from the creation date. For longer periods alter the -days parameter.
 		
-		Alternatively, you can use cert generator scripts that can be found in the 'linux' and 'windows' folders of the repository.
+		Alternatively, use windows/Generate_certs.ps1 (recommended on Windows), windows/Generate_certs.cmd,
+		or linux/generate_certs.sh from the repository.
 
 		ADCH++ requires TLS protocol version 1.2 or later by default. To change this and other
 		TLS connection parameters you can optionally define the following settings: 

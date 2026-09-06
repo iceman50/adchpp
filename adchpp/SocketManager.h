@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -72,6 +73,16 @@ public:
 	typedef std::function<void (const ManagedSocketPtr&)> IncomingHandler;
 	void setIncomingHandler(const IncomingHandler& handler) { incomingHandler = handler; }
 
+	/** Bind all configured listeners without starting the event loop. */
+	ADCHPP_DLL void prepare();
+
+	/** Return whether a listener for this port and address family was bound.
+	 * If available, publicAddress receives its configured HubAddress value and
+	 * securityModes receives bit 0 for plaintext and bit 1 for TLS listeners.
+	 */
+	ADCHPP_DLL bool getActiveListener(const std::string& port, bool v6,
+		std::string& publicAddress, unsigned int* securityModes = 0) const;
+
 	int run();
 
 	void setBufferSize(size_t newSize) { bufferSize = newSize; }
@@ -105,6 +116,18 @@ private:
 
 	ServerInfoList servers;
 	std::vector<SocketFactoryPtr> factories;
+
+	struct ActiveListener {
+		ActiveListener(const std::string& port_, bool v6_, bool secure_,
+			const std::string& publicAddress_) :
+			port(port_), v6(v6_), secure(secure_), publicAddress(publicAddress_) { }
+		std::string port;
+		bool v6;
+		bool secure;
+		std::string publicAddress;
+	};
+	std::vector<ActiveListener> activeListeners;
+	bool prepared;
 
 	IncomingHandler incomingHandler;
 

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -59,6 +60,10 @@ void Core::init() {
 }
 
 void Core::run() {
+	// Bind first so plugins can advertise only capabilities backed by active
+	// listeners. The event loop is still stopped, so no client is accepted
+	// before all plugins have loaded.
+	sm->prepare();
 	pm->load();
 
 	sm->run();

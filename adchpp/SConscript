@@ -1,3 +1,4 @@
+# Copyright (C) 2026 iceman50
 # vim: set filetype=py
 
 
@@ -38,6 +39,10 @@ env.Append(CPPDEFINES=["BUILDING_ADCHPP=1"])
 if env["CC"] == "cl":  # MSVC
     env.Append(LIBS=["advapi32", "user32"])
 
+if dev.is_win32():
+    # Util::secureRandom uses the operating-system CSPRNG in non-TLS builds.
+    env.Append(LIBS=["bcrypt"])
+
 if "HAVE_DL" in env["CPPDEFINES"]:
     env.Append(LIBS=["dl"])
 
@@ -46,16 +51,10 @@ if "HAVE_PTHREAD" in env["CPPDEFINES"]:
 
 if "HAVE_OPENSSL" in env["CPPDEFINES"]:
     if dev.is_win32():
-        if env["CC"] == "cl":  # MSVC
-            if env["mode"] == "debug":
-                env.Prepend(LIBS=["ssleay32d", "libeay32d"])
-            else:
-                env.Prepend(LIBS=["ssleay32", "libeay32"])
-        else:
-            env.Prepend(LIBS=["ssl", "crypto"])
-        env.Append(LIBS=["gdi32"])  # something in OpenSSL uses CreateDC etc...
-        env.Append(CPPPATH=["#/openssl/include"])
-        openssl_lib = "#/openssl/lib/"
+        env.Prepend(LIBS=["ssl", "crypto"])
+        env.Append(LIBS=["gdi32", "advapi32", "user32"])
+        env.Append(CPPPATH=[env["OPENSSL_ROOT"] + "/include"])
+        openssl_lib = env["OPENSSL_ROOT"] + "/lib/"
         if env["arch"] != "x86":
             openssl_lib += env["arch"] + "/"
         env.Append(LIBPATH=[openssl_lib])

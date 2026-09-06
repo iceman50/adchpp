@@ -17,8 +17,11 @@
 #include <adchpp/File.h>
 #include <adchpp/LogManager.h>
 #include <adchpp/SimpleXML.h>
+#include <adchpp/SocketManager.h>
+#include <adchpp/Util.h>
 
 #include <boost/asio/ip/address.hpp>
+#include <boost/asio/ip/tcp.hpp>
 
 using namespace std;
 using namespace std::placeholders;
@@ -29,6 +32,7 @@ const string HBRIManager::className = "HBRIManager";
 namespace {
 	const uint32_t FEATURE_HBRI = AdcCommand::toFourCC("HBRI");
 	const uint32_t CMD_TCP = AdcCommand::toCMD("TCP");
+	const long VALIDATION_TIMEOUT_SECONDS = 10;
 
 	bool boolValue(const string& value) {
 		string normalized(value);
@@ -82,19 +86,88 @@ bool HBRIManager::validationAddressValid(const string& value) {
 	return true;
 }
 
-bool HBRIManager::secondaryAddressValid(const string& value, bool v6) {
+bool HBRIManager::secondaryIntentValid(const string& value, bool v6) {
 	if(value.empty()) {
 		return false;
 	}
 	try {
 		const boost::asio::ip::address parsed = boost::asio::ip::address::from_string(value);
 		if(v6) {
-			return parsed.is_v6() && !parsed.to_v6().is_v4_mapped() && !parsed.to_v6().is_unspecified();
+			return parsed.is_v6() && !parsed.to_v6().is_v4_mapped();
 		}
-		return parsed.is_v4() && parsed.to_v4() != boost::asio::ip::address_v4::any();
+		return parsed.is_v4();
 	} catch(const boost::system::system_error&) {
 		return false;
 	}
+}
+
+bool HBRIManager::validationEndpointUsable(const boost::asio::ip::address& address, bool v6) {
+	if(v6) {
+		return address.is_v6() && !address.to_v6().is_v4_mapped() &&
+			!address.to_v6().is_unspecified() && !address.to_v6().is_multicast();
+	}
+	return address.is_v4() && address.to_v4() != boost::asio::ip::address_v4::any() &&
+		address.to_v4() != boost::asio::ip::address_v4::broadcast() &&
+		!address.to_v4().is_multicast();
+}
+
+bool HBRIManager::resolveValidationAddress(const string& value, bool v6,
+	string& resolvedAddress) const
+{
+	resolvedAddress.clear();
+	if(!validationAddressValid(value)) {
+		return false;
+	}
+
+	try {
+		const boost::asio::ip::address literal = boost::asio::ip::address::from_string(value);
+		if(!validationEndpointUsable(literal, v6)) {
+			return false;
+		}
+		resolvedAddress = literal.to_string();
+		return true;
+	} catch(const boost::system::system_error&) {
+		// A non-literal value may be a family-specific DNS name.
+	}
+
+	try {
+		boost::asio::io_service io;
+		boost::asio::ip::tcp::resolver resolver(io);
+		const boost::asio::ip::tcp::resolver::query::flags flags =
+			boost::asio::ip::tcp::resolver::query::address_configured |
+			boost::asio::ip::tcp::resolver::query::numeric_service;
+		const boost::asio::ip::tcp protocol = v6 ? boost::asio::ip::tcp::v6() :
+			boost::asio::ip::tcp::v4();
+		const boost::asio::ip::tcp::resolver::query query(protocol, value, port, flags);
+		const boost::asio::ip::tcp::resolver::iterator end;
+		for(boost::asio::ip::tcp::resolver::iterator i = resolver.resolve(query); i != end; ++i) {
+			const boost::asio::ip::address address = i->endpoint().address();
+			if(validationEndpointUsable(address, v6)) {
+				resolvedAddress = address.to_string();
+				return true;
+			}
+		}
+	} catch(const std::exception& e) {
+		LOG(className, "Unable to resolve HBRI IPv" + string(v6 ? "6" : "4") +
+			" address " + value + ": " + e.what());
+		return false;
+	}
+
+	LOG(className, "HBRI address " + value + " did not resolve to a usable IPv" +
+		string(v6 ? "6" : "4") + " endpoint");
+	return false;
+}
+
+bool HBRIManager::tokenValid(const string& value) {
+	if(value.size() != 39) {
+		return false;
+	}
+	for(size_t i = 0; i < value.size(); ++i) {
+		if(!((value[i] >= 'A' && value[i] <= 'Z') || (value[i] >= '2' && value[i] <= '7'))) {
+			return false;
+		}
+	}
+	return true;
 }
 
 bool HBRIManager::clientProtocol(const Entity& entity, bool& v6, string* normalizedAddress) {
@@ -162,10 +235,60 @@ bool HBRIManager::loadConfig() {
 		address6 = xml.getChildAttrib("Address6");
 		port = xml.getChildAttrib("Port");
 
-		if(enabled && (!validationAddressValid(address4) || !validationAddressValid(address6) || !portValid(port))) {
-			LOG(className, "Enabled HBRI requires valid Address4, Address6, and Port settings");
-			return false;
+		if(!enabled) {
+			return true;
 		}
+		if(!portValid(port)) {
+			LOG(className, "HBRI disabled: Port must be an integer from 1 through 65535");
+			enabled = false;
+			return true;
+		}
+		port = Util::toString(Util::toInt(port));
+
+		string listenerAddress4;
+		string listenerAddress6;
+		unsigned int security4 = 0;
+		unsigned int security6 = 0;
+		const bool listening4 = core.getSocketManager().getActiveListener(port, false,
+			listenerAddress4, &security4);
+		const bool listening6 = core.getSocketManager().getActiveListener(port, true,
+			listenerAddress6, &security6);
+		if(!listening4 || !listening6) {
+			LOG(className, "HBRI disabled: port " + port + " does not have active IPv4 and IPv6 listeners");
+			enabled = false;
+			return true;
+		}
+		if((security4 & security6) == 0) {
+			LOG(className, "HBRI disabled: IPv4 and IPv6 listeners on port " + port +
+				" do not share a plaintext or TLS mode");
+			enabled = false;
+			return true;
+		}
+
+		if(address4.empty()) {
+			address4 = listenerAddress4;
+		}
+		if(address6.empty()) {
+			address6 = listenerAddress6;
+		}
+
+		string resolved4;
+		string resolved6;
+		if(!resolveValidationAddress(address4, false, resolved4) ||
+			!resolveValidationAddress(address6, true, resolved6))
+		{
+			LOG(className, "HBRI disabled: Address4 and Address6 must resolve to usable endpoints of the correct family");
+			enabled = false;
+			return true;
+		}
+		if(resolved4 != address4) {
+			LOG(className, "Resolved HBRI IPv4 address " + address4 + " to " + resolved4);
+		}
+		if(resolved6 != address6) {
+			LOG(className, "Resolved HBRI IPv6 address " + address6 + " to " + resolved6);
+		}
+		address4 = resolved4;
+		address6 = resolved6;
 		return true;
 	} catch(const Exception& e) {
 		LOG(className, "Unable to load HBRI.xml: " + e.getError());
@@ -196,6 +319,19 @@ void HBRIManager::cancelPending(Session& session) {
 	if(!session.pendingToken.empty()) {
 		pending.erase(session.pendingToken);
 		session.pendingToken.clear();
+	}
+}
+
+void HBRIManager::expirePending(Session& session) {
+	if(session.pendingToken.empty()) {
+		return;
+	}
+	PendingMap::iterator validation = pending.find(session.pendingToken);
+	if(validation == pending.end() ||
+		std::chrono::steady_clock::now() >= validation->second.expires)
+	{
+		cancelPending(session);
+		session.wantsValidation = false;
 	}
 }
 
@@ -243,7 +379,7 @@ void HBRIManager::handleINF(Entity& entity, AdcCommand& command) {
 
 	const bool supportsHBRI = entity.hasSupport(FEATURE_HBRI);
 	const bool validated = entity.hasField(addressField);
-	const bool addressCandidate = hasAddress && secondaryAddressValid(advertisedAddress, secondaryV6);
+	const bool addressCandidate = hasAddress && secondaryIntentValid(advertisedAddress, secondaryV6);
 
 	// Rebuild the secondary UDP field from the validated value. Before address
 	// validation it is remembered privately and stripped from the broadcast.
@@ -260,6 +396,8 @@ void HBRIManager::handleINF(Entity& entity, AdcCommand& command) {
 		return;
 	}
 
+	expirePending(session);
+
 	if(entity.getState() == Entity::STATE_IDENTIFY) {
 		session.wantsValidation = true;
 		return;
@@ -273,13 +411,8 @@ void HBRIManager::handleINF(Entity& entity, AdcCommand& command) {
 
 string HBRIManager::generateToken() {
 	uint8_t bytes[24];
-	try {
-		std::random_device random;
-		for(size_t i = 0; i < sizeof(bytes); ++i) {
-			bytes[i] = static_cast<uint8_t>(random());
-		}
-	} catch(const std::exception&) {
-		LOG(className, "The system random source is unavailable; no HBRI token was issued");
+	if(!Util::secureRandom(bytes, sizeof(bytes))) {
+		LOG(className, "The cryptographic random source is unavailable; no HBRI token was issued");
 		return string();
 	}
 	return Encoder::toBase32(bytes, sizeof(bytes));
@@ -287,8 +420,12 @@ string HBRIManager::generateToken() {
 
 bool HBRIManager::sendChallenge(Entity& entity, Session& session) {
 	if(!enabled || !entity.hasSupport(FEATURE_HBRI) || entity.getState() != Entity::STATE_NORMAL ||
-		!session.wantsValidation || !session.pendingToken.empty())
+		!session.wantsValidation)
 	{
+		return false;
+	}
+	expirePending(session);
+	if(!session.pendingToken.empty()) {
 		return false;
 	}
 
@@ -309,7 +446,9 @@ bool HBRIManager::sendChallenge(Entity& entity, Session& session) {
 	}
 
 	const bool expectV6 = !session.primaryV6;
-	pending.insert(make_pair(token, PendingValidation(&entity, expectV6)));
+	const std::chrono::steady_clock::time_point expires = std::chrono::steady_clock::now() +
+		std::chrono::seconds(VALIDATION_TIMEOUT_SECONDS);
+	pending.insert(make_pair(token, PendingValidation(&entity, expectV6, expires)));
 	session.pendingToken = token;
 
 	AdcCommand request(CMD_TCP);
@@ -321,8 +460,10 @@ bool HBRIManager::sendChallenge(Entity& entity, Session& session) {
 	request.addParam("TO", token);
 	entity.send(request);
 
+	const string& endpoint = expectV6 ? address6 : address4;
 	LOG(className, "Requested " + string(expectV6 ? "IPv6" : "IPv4") +
-		" validation for " + AdcCommand::fromSID(entity.getSID()));
+		" validation at " + (expectV6 ? "[" + endpoint + "]" : endpoint) + ':' + port +
+		" for " + AdcCommand::fromSID(entity.getSID()));
 	return true;
 }
 
@@ -342,7 +483,9 @@ void HBRIManager::publishValidatedAddress(Entity& entity, bool v6, const string&
 
 	AdcCommand update(AdcCommand::CMD_INF, AdcCommand::TYPE_BROADCAST, entity.getSID());
 	update.addParam(addressField, address);
-	update.addParam(udpField, udpPort);
+	if(!udpPort.empty()) {
+		update.addParam(udpField, udpPort);
+	}
 	core.getClientManager().sendToAll(update.getBuffer());
 }
 
@@ -352,16 +495,17 @@ void HBRIManager::handleValidation(Entity& entity, AdcCommand& command, bool& ok
 
 	string token;
 	if(!enabled || command.getType() != AdcCommand::TYPE_HUB ||
-		entity.getState() != Entity::STATE_PROTOCOL || !command.getParam("TO", 0, token))
+		entity.getState() != Entity::STATE_PROTOCOL || !command.getParam("TO", 0, token) ||
+		!tokenValid(token))
 	{
-		sendStatus(entity, "150", "Validation token missing");
+		sendStatus(entity, "150", "Invalid validation token");
 		entity.disconnect(Util::REASON_PLUGIN, "Invalid HBRI validation");
 		return;
 	}
 
 	PendingMap::iterator validation = pending.find(token);
 	if(validation == pending.end()) {
-		sendStatus(entity, "150", "Unknown validation token");
+		sendStatus(entity, "150", "Invalid validation token");
 		entity.disconnect(Util::REASON_PLUGIN, "Invalid HBRI validation");
 		return;
 	}
@@ -369,11 +513,22 @@ void HBRIManager::handleValidation(Entity& entity, AdcCommand& command, bool& ok
 	Entity* mainEntity = validation->second.entity;
 	const bool expectV6 = validation->second.expectV6;
 	SessionMap::iterator session = sessions.find(mainEntity);
+	if(std::chrono::steady_clock::now() >= validation->second.expires) {
+		if(session != sessions.end() && session->second.pendingToken == token) {
+			cancelPending(session->second);
+			session->second.wantsValidation = false;
+		} else {
+			pending.erase(validation);
+		}
+		sendStatus(entity, "150", "Invalid validation token");
+		entity.disconnect(Util::REASON_PLUGIN, "Expired HBRI validation");
+		return;
+	}
 	if(session == sessions.end() || mainEntity->getState() != Entity::STATE_NORMAL ||
 		session->second.pendingToken != token)
 	{
 		pending.erase(validation);
-		sendStatus(entity, "150", "Unknown validation token");
+		sendStatus(entity, "150", "Invalid validation token");
 		entity.disconnect(Util::REASON_PLUGIN, "Expired HBRI validation");
 		return;
 	}

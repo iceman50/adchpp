@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,7 +32,14 @@
 namespace adchpp {
 
 struct ServerInfo {
+	// BindAddress remains supported for existing configurations. The
+	// family-specific values allow one logical listener to create independent
+	// IPv4 and IPv6 sockets with IPV6_V6ONLY enabled.
 	std::string ip;
+	std::string bind4;
+	std::string bind6;
+	std::string address4;
+	std::string address6;
 	std::string port;
 
 	struct TLSInfo {

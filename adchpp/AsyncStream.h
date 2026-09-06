@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,9 +25,10 @@ namespace adchpp {
 class AsyncStream : private boost::noncopyable {
 public:
 	typedef std::function<void (const boost::system::error_code& ec, size_t)> Handler;
+	typedef std::function<void (const boost::system::error_code& ec)> InitHandler;
 
 	virtual size_t available() = 0;
-	virtual void init(const std::function<void ()>& postInit) = 0;
+	virtual void init(const InitHandler& postInit) = 0;
 	virtual void setOptions(size_t bufferSize) = 0;
 	virtual std::string getIp() = 0;
 	virtual void prepareRead(const BufferPtr& buf, const Handler& handler) = 0;

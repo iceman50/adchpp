@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -205,8 +206,16 @@ void ManagedSocket::completeAccept(const boost::system::error_code& ec) throw() 
 		if(connectedHandler)
 			connectedHandler();
 
-		sock->init(std::bind(&ManagedSocket::ready, shared_from_this()));
+		sock->init(std::bind(&ManagedSocket::completeInit, shared_from_this(), std::placeholders::_1));
 
+	} else {
+		fail(Util::REASON_SOCKET_ERROR, ec.message());
+	}
+}
+
+void ManagedSocket::completeInit(const boost::system::error_code& ec) throw() {
+	if(!ec) {
+		ready();
 	} else {
 		fail(Util::REASON_SOCKET_ERROR, ec.message());
 	}

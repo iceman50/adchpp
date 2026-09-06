@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -228,6 +229,8 @@ public:
 	ADCHPP_DLL static std::string getLocalIp();
 
 	ADCHPP_DLL static uint32_t rand();
+	/** Fill a buffer from a cryptographically secure system random source. */
+	ADCHPP_DLL static bool secureRandom(uint8_t* data, size_t size) throw();
 	static uint32_t rand(uint32_t high) { return rand() % high; }
 	static uint32_t rand(uint32_t low, uint32_t high) { return rand(high-low) + low; }
 	static double randd() { return ((double)rand()) / ((double)0xffffffff); }

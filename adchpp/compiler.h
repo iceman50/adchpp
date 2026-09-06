@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,22 +17,26 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#if defined(__GNUC__)
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4)
-#error GCC 4.4 is required
+#if defined(__clang__)
+#if __clang_major__ < 3 || (__clang_major__ == 3 && __clang_minor__ < 3)
+#error Clang 3.3 or newer is required for C++11 support
 #endif
 
-#if __GNUC_MINOR__ == 4
-// GCC 4.4 is missing this type
-#define default_random_engine minstd_rand0
+#elif defined(__GNUC__)
+#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 9)
+#error GCC 4.9 or newer is required for C++11 support
 #endif
 
 #elif defined(_MSC_VER)
-#if _MSC_VER < 1600
-#error MSVC 10 (2010) is required
+#if _MSC_VER < 1900
+#error MSVC 14 (Visual Studio 2015) or newer is required for C++11 support
 #endif
 
 #else
 #error No supported compiler found
 
+#endif
+
+#if !defined(_MSC_VER) && __cplusplus < 201103L
+#error ADCH++ must be compiled in C++11 mode or newer
 #endif

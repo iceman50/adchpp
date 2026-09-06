@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -89,6 +90,10 @@ void loadXML(Core &core, const string& aFileName)
 					auto server = make_shared<ServerInfo>();
 					server->port = xml.getChildAttrib("Port", Util::emptyString);
 					server->ip = xml.getChildAttrib("BindAddress", Util::emptyString);
+					server->bind4 = xml.getChildAttrib("BindAddress4", Util::emptyString);
+					server->bind6 = xml.getChildAttrib("BindAddress6", Util::emptyString);
+					server->address4 = xml.getChildAttrib("HubAddress4", Util::emptyString);
+					server->address6 = xml.getChildAttrib("HubAddress6", Util::emptyString);
 
 					if(xml.getBoolChildAttrib("TLS")) {
 						server->TLSParams.cert = File::makeAbsolutePath(xml.getChildAttrib("Certificate"));

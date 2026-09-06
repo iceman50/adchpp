@@ -11,6 +11,10 @@
 #include <adchpp/Plugin.h>
 #include <adchpp/Signal.h>
 
+#include <boost/asio/ip/address.hpp>
+
+#include <chrono>
+
 class HBRIManager : public Plugin {
 public:
 	explicit HBRIManager(Core& core_);
@@ -30,9 +34,12 @@ private:
 
 	struct PendingValidation {
 		PendingValidation() : entity(0), expectV6(false) { }
-		PendingValidation(Entity* entity_, bool expectV6_) : entity(entity_), expectV6(expectV6_) { }
+		PendingValidation(Entity* entity_, bool expectV6_,
+			const std::chrono::steady_clock::time_point& expires_) :
+			entity(entity_), expectV6(expectV6_), expires(expires_) { }
 		Entity* entity;
 		bool expectV6;
+		std::chrono::steady_clock::time_point expires;
 	};
 
 	typedef std::unordered_map<Entity*, Session> SessionMap;
@@ -47,14 +54,19 @@ private:
 	void handleValidation(Entity& entity, AdcCommand& command, bool& ok);
 	bool sendChallenge(Entity& entity, Session& session);
 	void cancelPending(Session& session);
+	void expirePending(Session& session);
 	void sendStatus(Entity& entity, const std::string& code, const std::string& description);
 	void publishValidatedAddress(Entity& entity, bool v6, const std::string& address,
 		const std::string& udpPort);
 	std::string generateToken();
+	bool resolveValidationAddress(const std::string& value, bool v6,
+		std::string& resolvedAddress) const;
 
 	static bool clientProtocol(const Entity& entity, bool& v6, std::string* normalizedAddress = 0);
-	static bool secondaryAddressValid(const std::string& value, bool v6);
+	static bool secondaryIntentValid(const std::string& value, bool v6);
+	static bool validationEndpointUsable(const boost::asio::ip::address& address, bool v6);
 	static bool validationAddressValid(const std::string& value);
+	static bool tokenValid(const std::string& value);
 	static bool portValid(const std::string& value);
 	static bool containsSUP(const AdcCommand& command, const char* prefix, const char* feature);
 	static void removeAll(AdcCommand& command, const char* name);

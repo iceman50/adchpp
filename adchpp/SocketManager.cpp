@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006-2025 Jacek Sieka, arnetheduck on gmail point com
+ * Copyright (C) 2026 iceman50
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,6 +35,8 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ip/v6_only.hpp>
 
+#include <set>
+
 namespace adchpp {
 
 using namespace std;
@@ -44,6 +47,7 @@ using boost::system::system_error;
 
 SocketManager::SocketManager(Core &core) :
 core(core),
+prepared(false),
 bufferSize(1024),
 maxBufferSize(16 * 1024),
 overflowTimeout(60 * 1000),
@@ -126,8 +130,8 @@ class SimpleSocketStream : public SocketStream<ip::tcp::socket> {
 public:
 	SimpleSocketStream(boost::asio::io_service& x) : Stream(x) { }
 
-	virtual void init(const std::function<void ()>& postInit) {
-		postInit();
+	virtual void init(const InitHandler& postInit) {
+		postInit(error_code());
 	}
 
 	virtual void shutdown(const Handler& handler) {
@@ -158,7 +162,7 @@ class TLSSocketStream : public SocketStream<ssl::stream<ip::tcp::socket> > {
 public:
 	TLSSocketStream(io_service& x, ssl::context& y) : Stream(x, y) { }
 
-	virtual void init(const std::function<void ()>& postInit) {
+	virtual void init(const InitHandler& postInit) {
 		sock.async_handshake(ssl::stream_base::server, std::bind(&TLSSocketStream::handleHandshake,
 			this, std::placeholders::_1, postInit));
 	}
@@ -176,10 +180,8 @@ public:
 	}
 
 private:
-	void handleHandshake(const error_code& ec, const std::function<void ()>& postInit) {
-		if(!ec) {
-			postInit();
-		}
+	void handleHandshake(const error_code& ec, const InitHandler& postInit) {
+		postInit(ec);
 	}
 };
 
@@ -192,13 +194,26 @@ static string formatEndpoint(const ip::tcp::endpoint& ep) {
 
 class SocketFactory : public enable_shared_from_this<SocketFactory>, boost::noncopyable {
 public:
-	SocketFactory(SocketManager& sm, const SocketManager::IncomingHandler& handler_, const ServerInfo& info, const ip::tcp::endpoint& endpoint) :
+	SocketFactory(SocketManager& sm, const SocketManager::IncomingHandler& handler_, const ServerInfoPtr& info_, const ip::tcp::endpoint& endpoint) :
 		sm(sm),
 		acceptor(sm.io),
-		handler(handler_)
+		handler(handler_),
+		info(info_)
 	{
 		acceptor.open(endpoint.protocol());
+
+#ifdef _WIN32
+		// SO_REUSEADDR can allow another process to hijack a listening port on
+		// Windows. Server sockets should claim their endpoint exclusively.
+		const BOOL exclusive = TRUE;
+		if(::setsockopt(acceptor.native_handle(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+			reinterpret_cast<const char*>(&exclusive), sizeof(exclusive)) == SOCKET_ERROR)
+		{
+			throw system_error(error_code(::WSAGetLastError(), boost::asio::error::get_system_category()));
+		}
+#else
 		acceptor.set_option(socket_base::reuse_address(true));
+#endif
 		if(endpoint.protocol() == ip::tcp::v6()) {
 			acceptor.set_option(ip::v6_only(true));
 		}
@@ -206,25 +221,26 @@ public:
 		acceptor.bind(endpoint);
 		acceptor.listen(socket_base::max_connections);
 
-		LOGC(sm.getCore(), SocketManager::className,
-			"Listening on " + formatEndpoint(endpoint) +
-			" (Encrypted: " + (info.secure() ? "Yes)" : "No)"));
-
 #ifdef HAVE_OPENSSL
-		if(info.secure()) {
+		if(info->secure()) {
 		    context.reset(new ssl::context(ssl::context::sslv23_server));
 		    context->set_options(ssl::context::no_sslv2 | ssl::context::no_sslv3 | ssl::context::single_dh_use);
 		    //context->set_password_callback(boost::bind(&server::get_password, this));
-		    context->use_certificate_chain_file(info.TLSParams.cert);
-		    context->use_private_key_file(info.TLSParams.pkey, ssl::context::pem);
-		    context->use_tmp_dh_file(info.TLSParams.dh);
-		    SSL_CTX_set_min_proto_version(context->native_handle(), info.TLSParams.minVersion);
-		    if (info.TLSParams.cipherSuites13 != Util::emptyString) {
-			    SSL_CTX_set_ciphersuites(context->native_handle(), info.TLSParams.cipherSuites13.c_str());
+		    context->use_certificate_chain_file(info->TLSParams.cert);
+		    context->use_private_key_file(info->TLSParams.pkey, ssl::context::pem);
+		    context->use_tmp_dh_file(info->TLSParams.dh);
+		    SSL_CTX_set_min_proto_version(context->native_handle(), info->TLSParams.minVersion);
+		    if (info->TLSParams.cipherSuites13 != Util::emptyString) {
+			    SSL_CTX_set_ciphersuites(context->native_handle(), info->TLSParams.cipherSuites13.c_str());
 		    }
-		    SSL_CTX_set_security_level(context->native_handle(), info.TLSParams.securityLevel);
+		    SSL_CTX_set_security_level(context->native_handle(), info->TLSParams.securityLevel);
 		}
 #endif
+
+		LOGC(sm.getCore(), SocketManager::className,
+			"Listening on " + formatEndpoint(endpoint) +
+			" (IPv" + string(endpoint.address().is_v6() ? "6" : "4") +
+			", Encrypted: " + (info->secure() ? "Yes)" : "No)"));
 	}
 
 	void prepareAccept() {
@@ -263,11 +279,15 @@ public:
 		socket->completeAccept(ec);
 	}
 
-	void close() { acceptor.close(); }
+	void close() {
+		error_code ec;
+		acceptor.close(ec);
+	}
 
 	SocketManager &sm;
 	ip::tcp::acceptor acceptor;
 	SocketManager::IncomingHandler handler;
+	ServerInfoPtr info;
 
 #ifdef HAVE_OPENSSL
 	unique_ptr<ssl::context> context;
@@ -275,29 +295,106 @@ public:
 
 };
 
-int SocketManager::run() {
+void SocketManager::prepare() {
+	if(prepared) {
+		return;
+	}
+
 	LOG(SocketManager::className, "Starting");
 
+	prepared = true;
 	work.reset(new io_service::work(io));
+	activeListeners.clear();
+	set<string> endpoints;
 
 	for(auto i = servers.begin(), iend = servers.end(); i != iend; ++i) {
 		auto& si = *i;
-
-		try {
-			using ip::tcp;
-			tcp::resolver r(io);
-			auto local = r.resolve(tcp::resolver::query(si->ip, si->port,
-				tcp::resolver::query::address_configured | tcp::resolver::query::passive));
-
-			for(auto i = local; i != tcp::resolver::iterator(); ++i) {
-				auto factory = make_shared<SocketFactory>(*this, incomingHandler, *si, *i);
-				factory->prepareAccept();
-				factories.push_back(factory);
+		using ip::tcp;
+		typedef pair<string, int> BindRequest;
+		vector<BindRequest> requests;
+		if(!si->bind4.empty() || !si->bind6.empty()) {
+			if(!si->bind4.empty()) {
+				requests.push_back(make_pair(si->bind4, 4));
 			}
-		} catch(const std::exception& e) {
-			LOG(SocketManager::className, "Error while loading server on port " + si->port +": " + e.what());
+			if(!si->bind6.empty()) {
+				requests.push_back(make_pair(si->bind6, 6));
+			}
+		} else {
+			requests.push_back(make_pair(si->ip, 0));
+		}
+
+		for(vector<BindRequest>::const_iterator request = requests.begin(); request != requests.end(); ++request) {
+			tcp::resolver::iterator local;
+			try {
+				tcp::resolver r(io);
+				const tcp::resolver::query::flags flags = tcp::resolver::query::address_configured |
+					tcp::resolver::query::passive;
+				if(request->second == 4) {
+					local = r.resolve(tcp::resolver::query(tcp::v4(), request->first, si->port, flags));
+				} else if(request->second == 6) {
+					local = r.resolve(tcp::resolver::query(tcp::v6(), request->first, si->port, flags));
+				} else {
+					local = r.resolve(tcp::resolver::query(request->first, si->port, flags));
+				}
+			} catch(const std::exception& e) {
+				const string bindAddress = request->first.empty() ? "<all interfaces>" : request->first;
+				LOG(SocketManager::className, "Unable to resolve listener " + bindAddress + ':' +
+					si->port + ": " + e.what());
+				continue;
+			}
+
+			for(tcp::resolver::iterator endpoint = local; endpoint != tcp::resolver::iterator(); ++endpoint) {
+				const string formatted = formatEndpoint(*endpoint);
+				if(endpoints.find(formatted) != endpoints.end()) {
+					LOG(SocketManager::className, "Skipping duplicate listener " + formatted);
+					continue;
+				}
+
+				try {
+					auto factory = make_shared<SocketFactory>(*this, incomingHandler, si, *endpoint);
+					factory->prepareAccept();
+					factories.push_back(factory);
+					endpoints.insert(formatted);
+					const bool v6 = endpoint->endpoint().address().is_v6();
+					activeListeners.push_back(ActiveListener(Util::toString(endpoint->endpoint().port()),
+						v6, si->secure(), v6 ? si->address6 : si->address4));
+				} catch(const std::exception& e) {
+					LOG(SocketManager::className, "Unable to bind listener " + formatted + ": " + e.what());
+				}
+			}
 		}
 	}
+}
+
+bool SocketManager::getActiveListener(const string& port, bool v6, string& publicAddress,
+	unsigned int* securityModes) const
+{
+	publicAddress.clear();
+	if(securityModes) {
+		*securityModes = 0;
+	}
+	bool found = false;
+	for(vector<ActiveListener>::const_iterator i = activeListeners.begin(); i != activeListeners.end(); ++i) {
+		if(i->port != port || i->v6 != v6) {
+			continue;
+		}
+		found = true;
+		if(securityModes) {
+			*securityModes |= i->secure ? 2U : 1U;
+		}
+		if(!i->publicAddress.empty()) {
+			if(!publicAddress.empty() && publicAddress != i->publicAddress) {
+				publicAddress.clear();
+				return false;
+			}
+			publicAddress = i->publicAddress;
+		}
+	}
+	return found;
+}
+
+int SocketManager::run() {
+	prepare();
 
 	io.run();
 
@@ -311,6 +408,8 @@ void SocketManager::closeFactories() {
 		(*i)->close();
 	}
 	factories.clear();
+	activeListeners.clear();
+	prepared = false;
 }
 
 void SocketManager::addJob(const Callback& callback) throw() {

@@ -1,0 +1,64 @@
+Copyright (C) 2026 iceman50
+Licensed under GPL-3.0-or-later.
+
+iceman50 ADCH++ changelog
+========================
+
+This file records changes maintained by the iceman50 ADCH++ fork. The
+upstream project history remains in changelog.txt.
+
+2026-09-06
+----------
+
+Protocol extensions
+
+* Added the RTF0 rich-text negotiation and relay-policy plugin.
+* Added the BBS0 persistent bulletin-board index plugin.
+* Added the HBRI hybrid IPv4/IPv6 reachability-validation plugin.
+* Fixed HBRI interoperability with clients that use I6:: or I40.0.0.0 as
+  secondary-family validation intent markers.
+* Resolve HBRI DNS callback addresses once at startup and send only usable,
+  correct-family numeric endpoints in ITCP.
+* Publish only the secondary address observed by the validation socket; never
+  trust or broadcast the address claimed before HTCP validation.
+
+Security and listener handling
+
+* Generate single-use HBRI tokens with 192 bits of cryptographic randomness
+  and enforce a ten-second monotonic expiration time.
+* Reject malformed, expired, replayed, and wrong-family HBRI validations.
+* Advertise HBRI only when compatible IPv4 and IPv6 listeners are active and
+  both validation endpoints are usable.
+* Added independent BindAddress4/BindAddress6 and
+  HubAddress4/HubAddress6 listener settings while retaining legacy
+  BindAddress and HBRI.xml compatibility.
+* Bind resolved listener endpoints independently and report the exact endpoint
+  when resolution or binding fails.
+* Use exclusive server-port ownership on Windows to prevent SO_REUSEADDR port
+  hijacking; retain normal address reuse on Unix-like systems.
+* Propagate TLS handshake failures so incomplete TLS connections are cleaned
+  up immediately.
+* Added a reusable secure-random API backed by OpenSSL in TLS builds and the
+  Windows operating-system CSPRNG in non-TLS Windows builds.
+
+Build and deployment
+
+* Set the GCC and MinGW language standard explicitly to strict C++11.
+* Added compiler checks and documentation for the supported C++11 baseline.
+* Added a configurable Windows OpenSSL root and fail the build when secure=yes
+  is requested without usable OpenSSL headers or libraries.
+* Verified static TLS linkage with OpenSSL 3.5.7 so deployment does not require
+  separate OpenSSL DLLs.
+* Added windows/Generate_certs.ps1 for validated self-signed certificates,
+  private keys, trusted directories, and RFC 7919 FFDHE2048 parameters.
+* Added Windows release and installer packaging for RTF0, BBS0, HBRI, their
+  configuration files, and the PowerShell certificate generator.
+
+Validation
+
+* Added wire-level tests for both HBRI directions, unspecified-address intent,
+  DNS/numeric endpoint handling, TLS validation, token replay and expiration,
+  wrong-family callbacks, malformed TLS handshakes, and listener gating.
+* Retained passing RTF0/BBS0 wire and persistence regression coverage.
+* Enforced LF-only repository text files and iceman50 copyright notices on
+  files added or modified by this fork.

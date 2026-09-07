@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adchpp-ui"
+version = "0.1.0"
+description = "Cross-platform ADCH++ configuration manager"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-or-later"
+dependencies = ["PyQt6>=6.11,<7"]
+
+[project.scripts]
+adchpp-ui = "adchpp_ui.__main__:main"
+
+[tool.setuptools]
+packages = ["adchpp_ui"]

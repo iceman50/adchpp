@@ -36,4 +36,5 @@
 .reference-adchpp-hbri/
 /__pycache__
 /build
+/config/
 /test/__pycache__
